@@ -6,14 +6,14 @@ PORT = 5000
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == '/':
-            resopnse = {
+            response = {
                     "status": "healthy",
                     "service": "health-api",
                     "version": "v1.0"
                     }
 
             self.send_response(200)
-            self.header("Content-type", "application/json")
+            self.send_header("Content-type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps(response).encode())
         else:
