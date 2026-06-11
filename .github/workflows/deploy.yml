@@ -1,35 +1,51 @@
-name: Health-run-api
+name: CI-CD Pipeline
 
 on:
   push:
     branches: [ main ]
 
+env:
+  AWS_REGION: ap-southeast-2
+  IMAGE_TAG: v1
+  ECR_REPOSITORY: graduation-app
+
 jobs:
-  deploy-app:
+  deploy:
     runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout the Code
-        uses: actions/checkout@v4
+  steps:
+    - name: Checkout the Code
+      uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with: 
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-southeast-2 
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
+    - name: Login to Amazon to ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Build, tag and Push Image to ECR
-        env: 
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: graduation-app
-          IMAGE_TAG: v1
-        run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG . 
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          
+    - name: Build and Push the Image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      run: |
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
+    - name: Deploy to EC2 via SSH
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          aws ecr get-login-password --region ap-southeast-2 | docker login --username AWS --password-stdin 337405469571.dkr.ecr.ap-southeast-2.amazonaws.com
+          docker pull 337405469571.dkr.ecr.ap-southeast-2.amazonaws.com/graduation-app:v1
+
+          docker stop health-app || true
+          docker rm health-app || true
+
+          docker run -d -p 80:5000 --name health-app 337405469571.dkr.ecr.ap-southeast-2.amazonaws.com/graduation-app:v1
