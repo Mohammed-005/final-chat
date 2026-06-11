@@ -9,7 +9,7 @@ class Handler(BaseHTTPRequestHandler):
             response = {
                     "status": "healthy",
                     "service": "health-api",
-                    "version": "v1.0"
+                    "version": "v1.1"
                     }
 
             self.send_response(200)
